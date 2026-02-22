@@ -3,7 +3,6 @@ import env from 'dotenv'
 import cors from 'cors'
 import { connectDB } from './config/connectDB.js'
 import authRoute from './routes/auth.route.js'
-
 env.config()
 const app = express()
 app.use(express.json())
@@ -24,5 +23,4 @@ const startServer = async () => {
     }
 }
 startServer()
-
 

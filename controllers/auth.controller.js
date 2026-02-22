@@ -2,6 +2,9 @@ import axios from 'axios';
 import admin from '../config/firebaseAdmin.js';
 import User from '../models/user.Model.js'
 import { OAuth2Client } from 'google-auth-library';
+import ApiError from '../utils/ApiError.js';
+import { sendSuccess } from '../utils/apiResponse.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
@@ -9,170 +12,150 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
     this method will create a new user in firebase auth
     as well as create a doc in user collection.
 */
-const signup = async (req, res) => {
+const signup = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
+    }
+
+    let userRecord;
     try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required",
-            })
-        }
-        const userRecord = await admin.auth().createUser({
-            email: email,
-            password: password,
+        userRecord = await admin.auth().createUser({
+            email,
+            password,
             emailVerified: false,
             disabled: false
-        })
-        try {
-            const userDB = new User({
-                email: userRecord.email,
-                uid: userRecord.uid
-            });
-            await userDB.save();
-        } catch (err) {
-            await admin.auth().deleteUser(userRecord.uid);
-            return res.status(500).json({
-                success: false,
-                message: "Database error. User rollback completed.",
-            });
-        }
-
-        return res.status(201).json({
-            success: true,
-            message: "User created successfully",
-            uid: userRecord.uid,
-            email: userRecord.email,
-        })
+        });
     } catch (err) {
-        console.log(`firebase error ${err}`)
-        return res.status(400).json({
-            success: false,
-            message: err.message,
-        })
+        throw new ApiError(400, err.message || "Unable to create user");
     }
-}
+
+    try {
+        const userDB = new User({
+            email: userRecord.email,
+            uid: userRecord.uid
+        });
+        await userDB.save();
+    } catch (_err) {
+        await admin.auth().deleteUser(userRecord.uid);
+        throw new ApiError(500, "Database error. User rollback completed.");
+    }
+
+    return sendSuccess(res, 201, "User created successfully", {
+        uid: userRecord.uid,
+        email: userRecord.email,
+    });
+});
 /*
     this method will send reset password link into register
     mail id.
  */
-const forgotPassword = async (req, res) => {
+const forgotPassword = asyncHandler(async (req, res) => {
+    const { email } = req.body;
+    if (!email) {
+        throw new ApiError(400, "Email is required");
+    }
+
     try {
-        const { email } = req.body;
-        if (!email) {
-            return res.status(400).json({
-                success: false,
-                message: "Email is required",
-            })
-        }
-        await axios.post(`
-            https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_API_KEY}`,
+        await axios.post(
+            `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${process.env.FIREBASE_API_KEY}`,
             {
                 requestType: "PASSWORD_RESET",
-                email: email,
-            });
-        return res.status(200).json({
-            success: true,
-            message: "Password reset email sent",
-        });
+                email,
+            }
+        );
     } catch (err) {
-        console.log(`there is something error ${err}`)
-        return res.status(400).json({
-            success: false,
-            message: err.message,
-        })
+        const firebaseMessage = err?.response?.data?.error?.message || err.message;
+        throw new ApiError(400, firebaseMessage || "Unable to send reset email");
     }
-}
+
+    return sendSuccess(res, 200, "Password reset email sent");
+});
 /*
     this method will signin and return token realted 
     details.
 */
-const signin = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required",
-            })
-        }
+const signin = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
+    }
 
-        const response = await axios.post(
+    let response;
+    try {
+        response = await axios.post(
             `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${process.env.FIREBASE_API_KEY}`,
             {
                 email,
                 password,
                 returnSecureToken: true,
             }
-        )
-        return res.status(200).json({
-            success: true,
-            message: 'login successfully',
-            user: {
-                email: response.data.email,
-                uid: response.data.localId
-            },
-            tokenInfo: {
-                token: response.data.idToken,
-                refreshToken: response.data.refreshToken,
-                expiresIn: response.data.expiresIn
-            }
-        });
+        );
     } catch (err) {
-        console.log(`there is something error ${err}`)
-        return res.status(400).json({
-            success: false,
-            message: err.message,
-        })
-
+        const firebaseError = err?.response?.data?.error?.message || "Something went wrong";
+        const errorMap = {
+            INVALID_LOGIN_CREDENTIALS: "Invalid email or password",
+            EMAIL_NOT_FOUND: "User not found",
+            INVALID_PASSWORD: "Wrong password",
+            USER_DISABLED: "Account disabled",
+        };
+        throw new ApiError(400, errorMap[firebaseError] || firebaseError);
     }
-}
+
+    return sendSuccess(res, 200, "Login successful", {
+        user: {
+            email: response.data.email,
+            uid: response.data.localId
+        },
+        tokenInfo: {
+            token: response.data.idToken,
+            refreshToken: response.data.refreshToken,
+            expiresIn: response.data.expiresIn
+        }
+    });
+});
 
 /*
     this method will genrate a new token from refresh token
     in every 1 hour.
 */
-const refreshToken = async (req, res) => {
+const refreshToken = asyncHandler(async (req, res) => {
+    const { refreshToken: incomingRefreshToken } = req.body;
+    if (!incomingRefreshToken) {
+        throw new ApiError(400, "Refresh token is required");
+    }
+
+    let response;
     try {
-        const { refreshToken } = req.body;
-        if (!refreshToken) {
-            return res.status(400).json({
-                success: false,
-                message: "Refresh token is required",
-            })
-        }
-        const response = await axios.post(
+        response = await axios.post(
             `https://securetoken.googleapis.com/v1/token?key=${process.env.FIREBASE_API_KEY}`,
             {
                 grant_type: "refresh_token",
-                refresh_token: refreshToken,
+                refresh_token: incomingRefreshToken,
             }
-        )
-        return res.status(200).json({
-            success: true,
-            message: "Token refreshed successfully",
-            tokens: {
-                idToken: response.data.id_token,
-                refreshToken: response.data.refresh_token,
-                expiresIn: response.data.expires_in,
-            },
-        })
+        );
     } catch (err) {
-        console.log(`there is some error ${err}`)
+        const firebaseMessage = err?.response?.data?.error?.message || err.message;
+        throw new ApiError(400, firebaseMessage || "Unable to refresh token");
     }
-}
 
-const googleLogin = async (req, res) => {
+    return sendSuccess(res, 200, "Token refreshed successfully", {
+        tokens: {
+            idToken: response.data.id_token,
+            refreshToken: response.data.refresh_token,
+            expiresIn: response.data.expires_in,
+        },
+    });
+});
+
+const googleLogin = asyncHandler(async (req, res) => {
+    const { googleToken } = req.body;
+    if (!googleToken) {
+        throw new ApiError(400, "Google token is required");
+    }
+
     try {
-        const { googleToken } = req.body;
-        if (!googleToken) {
-            return res.status(400).json({
-                success: false,
-                message: "Google token is required",
-            });
-        }
-
-        // verify google token 
+        // verify google token
         const ticket = await client.verifyIdToken({
             idToken: googleToken,
             audience: process.env.GOOGLE_CLIENT_ID
@@ -201,6 +184,7 @@ const googleLogin = async (req, res) => {
                 email: firebaseUser.email,
                 uid: firebaseUser.uid
             });
+            await userDB.save();
         }
 
         const customToken = await admin.auth().createCustomToken(firebaseUser.uid);
@@ -210,12 +194,10 @@ const googleLogin = async (req, res) => {
                 token: customToken,
                 returnSecureToken: true,
             })
-        return res.status(200).json({
-            success: true,
-            message: "Google login successful 🎉",
+        return sendSuccess(res, 200, "Google login successful", {
             user: {
-                uid: response.data.localId,
-                email: response.data.email,
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
             },
             tokens: {
                 idToken: response.data.idToken,
@@ -224,11 +206,7 @@ const googleLogin = async (req, res) => {
             },
         });
     } catch (err) {
-        console.log(`there is some error in google login ${err}`);
-        return res.status(401).json({
-            success: false,
-            message: "Google authentication failed",
-        });
+        throw new ApiError(401, "Google authentication failed", err.message);
     }
-}
-export { signup, forgotPassword, signin, refreshToken ,googleLogin };
+});
+export { signup, forgotPassword, signin, refreshToken, googleLogin };
