@@ -3,6 +3,7 @@ import env from 'dotenv'
 import cors from 'cors'
 import { connectDB } from './config/connectDB.js'
 import authRoute from './routes/auth.route.js'
+import errorHandler from './middleware/errorHandler.js'
 env.config()
 const app = express()
 app.use(express.json())
@@ -11,6 +12,7 @@ app.use(cors())
 
 app.use('/api/auth',authRoute);
 
+app.use(errorHandler)
 
 const startServer = async () => {
     try {
