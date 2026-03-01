@@ -1,6 +1,6 @@
 import axios from "axios";
 import admin from "../config/firebaseAdmin.js";
-import User from "../models/user.Model.js";
+import User from "../models/user.model.js";
 import { OAuth2Client } from "google-auth-library";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppError from "../utils/AppError.js";
