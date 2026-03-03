@@ -4,6 +4,7 @@ import cors from 'cors'
 import { connectDB } from './config/connectDB.js'
 import authRoute from './routes/auth.route.js'
 import projectRoute from './routes/project.route.js'
+import collectionRoute from './routes/collection.route.js'
 import errorHandler from './middleware/errorHandler.js'
 env.config()
 const app = express()
@@ -13,6 +14,7 @@ app.use(cors())
 
 app.use('/api/auth',authRoute);
 app.use('/api/project',projectRoute);
+app.use('/api/collection',collectionRoute);
 app.use(errorHandler)
 
 const startServer = async () => {
