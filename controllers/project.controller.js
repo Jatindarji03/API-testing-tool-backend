@@ -2,7 +2,8 @@ import ProjectModel from "../models/project.model.js";
 import AppError from "../utils/AppError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import AppResponse from "../utils/AppResponse.js";
-
+import CollectionModel from "../models/collection.model.js";
+import mongoose from "mongoose";
 export const createProject = asyncHandler(async (req, res) => {
   const { projectName } = req.body;
   console.log("CREATE CONTROLLER HIT");
@@ -46,20 +47,34 @@ export const updateProject = asyncHandler(async (req, res) => {
 
 export const deleteProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
+  const userId = req.user?.uid;
   if (!projectId) {
-    throw new AppError("Project Id Is Required", 400);
+    throw new AppError("Project Id is Required", 400);
   }
-  const project = await ProjectModel.findOneAndDelete({
-    _id: projectId,
-    userId: req.user.uid,
-  });
-  if (!project) {
-    throw new AppError(
-      "Project not found or you do not have permission to delete it",
-      404,
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const project = await ProjectModel.findOne(
+      {
+        _id: projectId,
+        userId: userId,
+      },
+      null,
+      { session },
     );
+    if (!project) {
+      throw new AppError("Project not found or you do not have access", 404);
+    }
+    await CollectionModel.deleteMany({ projectId: projectId }, { session });
+    await ProjectModel.deleteOne({ _id: projectId }, { session });
+    await session.commitTransaction();
+    session.endSession();
+    return AppResponse.success(res, {}, "project deleted successfully", 200);
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
   }
-  return AppResponse.success(res, {}, "deleted succesfully", 200);
 });
 
 export const getAllUserProject = asyncHandler(async (req, res) => {
