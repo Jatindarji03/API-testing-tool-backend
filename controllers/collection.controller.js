@@ -45,7 +45,7 @@ export const createCollection = asyncHandler(async (req, res) => {
 export const getAllCollectionByProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
   const project = await ProjectModel.find({
-    userId: req.user.uid,
+    userId: req.user?.uid,
     _id: projectId,
   });
   if (!project) {
@@ -106,4 +106,64 @@ export const getAllCollectionByProjectTree = asyncHandler(async (req, res) => {
   ]);
 
   return AppResponse.success(res, { collections }, "collection fetched", 200);
+});
+
+export const deleteCollection = asyncHandler(async (req, res) => {
+  const { collectionId } = req.params;
+  const userId = req.user?.uid;
+  if (!collectionId) {
+    throw new AppError("Collection Id is required", 400);
+  }
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+    const collection =
+      await CollectionModel.findById(collectionId).session(session);
+    if (!collection) {
+      throw new AppError("Collection Not Found", 404);
+    }
+    const project = await ProjectModel.findOne({
+      _id: collection.projectId,
+      userId: userId,
+    }).session(session);
+
+    if (!project) {
+      throw new AppError("Project Not Found or Access Denied", 403);
+    }
+
+    const result = await CollectionModel.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(collectionId),
+        },
+      },
+      {
+        $graphLookup: {
+          from: "collections",
+          startWith: "$_id",
+          connectFromField: "_id",
+          connectToField: "parentCollectionId",
+          as: "descendants",
+          restrictSearchWithMatch: {
+            projectId: collection.projectId,
+          },
+        },
+      },
+      { $project: { descendants: 1 } },
+    ]).session(session);
+    const descendants = result[0]?.descendants ?? [];
+    const idsToDelete = [collection._id, ...descendants.map((doc) => doc._id)];
+
+    await CollectionModel.deleteMany(
+      { _id: { $in: idsToDelete } },
+      { session: session },
+    );
+    await session.commitTransaction();
+    session.endSession();
+    return AppResponse.success(res, {}, "Collection Deleted", 200);
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 });

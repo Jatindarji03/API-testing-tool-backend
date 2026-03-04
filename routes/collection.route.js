@@ -4,6 +4,7 @@ import {
   createCollection,
   getAllCollectionByProject,
   getAllCollectionByProjectTree,
+  deleteCollection,
 } from "../controllers/collection.controller.js";
 const collectionRoute = Router();
 collectionRoute.post("/create-collection", authMiddleware, createCollection);
@@ -16,5 +17,10 @@ collectionRoute.get(
   "/all-collections-tree/:projectId",
   authMiddleware,
   getAllCollectionByProjectTree,
+);
+collectionRoute.delete(
+  "/delete-collection/:collectionId",
+  authMiddleware,
+  deleteCollection,
 );
 export default collectionRoute;
