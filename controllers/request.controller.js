@@ -82,6 +82,9 @@ export const saveRequest = asyncHandler(async (req, res) => {
       400,
     );
   }
+  if (!mongoose.Types.ObjectId.isValid(collectionId)) {
+    throw new AppError("Invalid Collection Id", 400);
+  }
   const collection = await CollectionModel.findById(collectionId);
   if (!collection) {
     throw new AppError("Collection Not Found", 404);
@@ -113,6 +116,9 @@ export const deleteRequest = asyncHandler(async (req, res) => {
   const { requestId } = req.params;
   if (!requestId) {
     throw new AppError("Request Id is required", 400);
+  }
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new AppError("Invalid Request Id", 400);
   }
   const request = await RequestModel.aggregate([
     {
@@ -161,6 +167,9 @@ export const updateRequest = asyncHandler(async (req, res) => {
   const { method, apiUrl, header, params, body, bodyType } = req.body;
   if (!requestId) {
     throw new AppError("Request Id is required", 400);
+  }
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new AppError("Invalid Request Id", 400);
   }
   const request = await RequestModel.aggregate([
     {
@@ -219,6 +228,9 @@ export const getRequestById = asyncHandler(async (req, res) => {
   if (!requestId) {
     throw new AppError("Request Id is required", 400);
   }
+  if (!mongoose.Types.ObjectId.isValid(requestId)) {
+    throw new AppError("Invalid Request Id", 400);
+  }
   const request = await RequestModel.findOne({ _id: requestId });
   if (!request) {
     throw new AppError("Request Not Found", 404);
@@ -231,6 +243,9 @@ export const getRequestByCollectionId = asyncHandler(async (req, res) => {
   if (!collectionId) {
     throw new AppError("Collection Id is required");
   }
+  if (!mongoose.Types.ObjectId.isValid(collectionId)) {
+    throw new AppError("Invalid Collection Id", 400);
+  }
   const collection = await CollectionModel.findById(collectionId);
   if (!collection) {
     throw new AppError("Collection Not Found", 404);
@@ -241,11 +256,11 @@ export const getRequestByCollectionId = asyncHandler(async (req, res) => {
     userId: req.user.uid,
   });
   if (!project) {
-    return new AppError("Access Denied", 403);
+    throw new AppError("Access Denied", 403);
   }
   const request = await RequestModel.find(
     { collectionId: collectionId },
-    { _id: 1, apiName: 1 },
+    { _id: 1, apiName: 1, method: 1 },
   );
   return AppResponse.success(res, { request }, "Request Fetched", 200);
 });

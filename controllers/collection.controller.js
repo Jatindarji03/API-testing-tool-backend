@@ -4,6 +4,7 @@ import CollectionModel from "../models/collection.model.js";
 import ProjectModel from "../models/project.model.js";
 import AppResponse from "../utils/AppResponse.js";
 import mongoose from "mongoose";
+import RequestModel from "../models/request.model.js";
 export const createCollection = asyncHandler(async (req, res) => {
   const {
     projectId,
@@ -154,6 +155,12 @@ export const deleteCollection = asyncHandler(async (req, res) => {
     const descendants = result[0]?.descendants ?? [];
     const idsToDelete = [collection._id, ...descendants.map((doc) => doc._id)];
 
+    await RequestModel.deleteMany(
+      {
+        collectionId: { $in: idsToDelete },
+      },
+      { session },
+    );
     await CollectionModel.deleteMany(
       { _id: { $in: idsToDelete } },
       { session: session },
