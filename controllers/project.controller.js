@@ -4,6 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 import AppResponse from "../utils/AppResponse.js";
 import CollectionModel from "../models/collection.model.js";
 import mongoose from "mongoose";
+import RequestModel from "../models/request.model.js";
 export const createProject = asyncHandler(async (req, res) => {
   const { projectName } = req.body;
   console.log("CREATE CONTROLLER HIT");
@@ -65,6 +66,18 @@ export const deleteProject = asyncHandler(async (req, res) => {
     if (!project) {
       throw new AppError("Project not found or you do not have access", 404);
     }
+    const collections = await CollectionModel.find(
+      {
+        projectId: projectId,
+      },
+      { _id: 1 },
+      { session },
+    );
+    const collectionsIds = collections.map((c) => c._id);
+    await RequestModel.deleteMany(
+      { collectionId: { $in: collectionsIds } },
+      { session },
+    );
     await CollectionModel.deleteMany({ projectId: projectId }, { session });
     await ProjectModel.deleteOne({ _id: projectId }, { session });
     await session.commitTransaction();
