@@ -5,9 +5,9 @@ import AppResponse from "../utils/AppResponse.js";
 import CollectionModel from "../models/collection.model.js";
 import mongoose from "mongoose";
 import RequestModel from "../models/request.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 export const createProject = asyncHandler(async (req, res) => {
   const { projectName } = req.body;
-  console.log("CREATE CONTROLLER HIT");
   if (!projectName) {
     throw new AppError("Project Name Is Reqired", 400);
   }
@@ -16,8 +16,12 @@ export const createProject = asyncHandler(async (req, res) => {
     userId: req.user.uid,
   });
   await project.save().catch((err) => {
-    console.log("there is something error while saving data");
     throw new AppError("there is something error while saving data", 500, err);
+  });
+  await ProjectMember.create({
+    userId: req.user.uid,
+    role: "owner",
+    projectId: project._id,
   });
   return AppResponse.success(res, { project }, "Project Created", 201);
 });
@@ -25,7 +29,6 @@ export const createProject = asyncHandler(async (req, res) => {
 export const updateProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
   const { projectName } = req.body;
-  console.log(projectId);
   if (!projectName && !projectId) {
     throw new AppError("Project Id and Name is required", 400);
   }
