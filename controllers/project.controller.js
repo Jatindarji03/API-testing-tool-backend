@@ -99,10 +99,25 @@ export const getAllUserProject = asyncHandler(async (req, res) => {
   if (!userId) {
     throw new AppError("inavlid user", 401);
   }
-  const projects = await ProjectModel.find({ userId: userId });
+
+  const memberships = await ProjectMember.find({ userId: userId });
+
+  if (memberships.length === 0) {
+    return AppResponse.success(res, [], "No Projects Found", 200);
+  }
+
+  const projectIds = memberships.map((m) => m.projectId);
+  const projects = await ProjectModel.find({ _id: { $in: projectIds } }).lean();
+
+  const result = projects.map((project) => {
+    const membership = memberships.find(
+      (m) => m.projectId.toString() === project._id.toString(),
+    );
+    return { ...project, role: membership.role };
+  });
   return AppResponse.success(
     res,
-    { projects },
+    result,
     projects.length === 0 ? "No Projects Found" : "Projects Fetched",
     200,
   );

@@ -5,10 +5,19 @@ import {
   inviteMember,
   getMembers,
 } from "../controllers/projectMember.controller.js";
-import asyncHandler from "../utils/asyncHandler.js";
 const projectMemberRoutes = Router();
 
-projectMemberRoutes.post("/invite/:projectId", authMiddleware, inviteMember);
-projectMemberRoutes.get("/:projectId", authMiddleware, getMembers);
+projectMemberRoutes.post(
+  "/invite/:projectId",
+  authMiddleware,
+  checkProjectAccess(["owner"]),
+  inviteMember,
+);
+projectMemberRoutes.get(
+  "/:projectId",
+  authMiddleware,
+  checkProjectAccess(["owner", "editor", "viewer"]),
+  getMembers,
+);
 
 export default projectMemberRoutes;

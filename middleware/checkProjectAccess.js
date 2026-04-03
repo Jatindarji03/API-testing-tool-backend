@@ -4,7 +4,7 @@ import asyncHandler from "../utils/asyncHandler.js";
 export  const checkProjectAccess = (roles = []) => {
   return asyncHandler(async (req, res, next) => {
     const { projectId } = req.params;
-    const userId = req.user.userId;
+    const userId = req.user.uid;
 
     const member = await ProjectMember.findOne({
       userId: userId,
