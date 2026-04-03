@@ -85,20 +85,7 @@ export const saveRequest = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(collectionId)) {
     throw new AppError("Invalid Collection Id", 400);
   }
-  const collection = await CollectionModel.findById(collectionId);
-  if (!collection) {
-    throw new AppError("Collection Not Found", 404);
-  }
-  const project = await ProjectModel.findOne({
-    _id: collection.projectId,
-    userId: req.user.uid,
-  });
-  if (!project) {
-    throw new AppError(
-      "You dont have access to create an api into this project",
-      403,
-    );
-  }
+
   const request = await RequestModel.create({
     collectionId: collectionId,
     apiName: apiName,
@@ -120,43 +107,6 @@ export const deleteRequest = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(requestId)) {
     throw new AppError("Invalid Request Id", 400);
   }
-  const request = await RequestModel.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(requestId),
-      },
-    },
-    {
-      $lookup: {
-        from: "collections",
-        localField: "collectionId",
-        foreignField: "_id",
-        as: "collections",
-      },
-    },
-    {
-      $unwind: "$collections",
-    },
-    {
-      $lookup: {
-        from: "projects",
-        localField: "collections.projectId",
-        foreignField: "_id",
-        as: "projects",
-      },
-    },
-    {
-      $unwind: "$projects",
-    },
-    {
-      $match: {
-        "projects.userId": req.user.uid,
-      },
-    },
-  ]);
-  if (!request.length) {
-    throw new AppError("Request not found or access denied", 403);
-  }
   await RequestModel.deleteOne({ _id: requestId });
   return AppResponse.success(res, {}, "Request Deleted", 200);
 });
@@ -171,43 +121,6 @@ export const updateRequest = asyncHandler(async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(requestId)) {
     throw new AppError("Invalid Request Id", 400);
   }
-  const request = await RequestModel.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(requestId),
-      },
-    },
-    {
-      $lookup: {
-        from: "collections",
-        localField: "collectionId",
-        foreignField: "_id",
-        as: "collections",
-      },
-    },
-    {
-      $unwind: "$collections",
-    },
-    {
-      $lookup: {
-        from: "projects",
-        localField: "collections.projectId",
-        foreignField: "_id",
-        as: "projects",
-      },
-    },
-    {
-      $unwind: "$projects",
-    },
-    {
-      $match: {
-        "projects.userId": req.user.uid,
-      },
-    },
-  ]);
-  if (!request.length) {
-    throw new AppError("Request not found or access denied", 403);
-  }
 
   if (method) updatedData.method = method;
   if (apiUrl) updatedData.apiUrl = apiUrl;
@@ -220,6 +133,9 @@ export const updateRequest = asyncHandler(async (req, res) => {
     { $set: updatedData },
     { new: true },
   );
+  if (!updateRequest) {
+    throw new AppError("Request Not Found", 404);
+  }
   return AppResponse.success(res, { updatedRequest }, "request updated", 200);
 });
 
@@ -241,22 +157,10 @@ export const getRequestById = asyncHandler(async (req, res) => {
 export const getRequestByCollectionId = asyncHandler(async (req, res) => {
   const { collectionId } = req.params;
   if (!collectionId) {
-    throw new AppError("Collection Id is required");
+    throw new AppError("Collection Id is required",400);
   }
   if (!mongoose.Types.ObjectId.isValid(collectionId)) {
     throw new AppError("Invalid Collection Id", 400);
-  }
-  const collection = await CollectionModel.findById(collectionId);
-  if (!collection) {
-    throw new AppError("Collection Not Found", 404);
-  }
-
-  const project = await ProjectModel.findOne({
-    _id: collection.projectId,
-    userId: req.user.uid,
-  });
-  if (!project) {
-    throw new AppError("Access Denied", 403);
   }
   const request = await RequestModel.find(
     { collectionId: collectionId },

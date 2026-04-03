@@ -33,7 +33,7 @@ export const updateProject = asyncHandler(async (req, res) => {
     throw new AppError("Project Id and Name is required", 400);
   }
   const updatedProject = await ProjectModel.findOneAndUpdate(
-    { _id: projectId, userId: req.user.uid },
+    { _id: projectId },
     { $set: { projectName } },
     { new: true },
   );
@@ -51,7 +51,6 @@ export const updateProject = asyncHandler(async (req, res) => {
 
 export const deleteProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const userId = req.user?.uid;
   if (!projectId) {
     throw new AppError("Project Id is Required", 400);
   }
@@ -61,7 +60,6 @@ export const deleteProject = asyncHandler(async (req, res) => {
     const project = await ProjectModel.findOne(
       {
         _id: projectId,
-        userId: userId,
       },
       null,
       { session },
@@ -82,6 +80,7 @@ export const deleteProject = asyncHandler(async (req, res) => {
       { session },
     );
     await CollectionModel.deleteMany({ projectId: projectId }, { session });
+    await ProjectMember.deleteMany({ projectId: projectId }, { session });
     await ProjectModel.deleteOne({ _id: projectId }, { session });
     await session.commitTransaction();
     session.endSession();
