@@ -3,10 +3,10 @@ import UserModel from "../models/user.model.js";
 import AppError from "../utils/AppError.js";
 import AppResponse from "../utils/AppResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
-
+import mongoose from "mongoose";
 export const inviteMember = asyncHandler(async (req, res) => {
   const { role, email } = req.body;
-  const {projectId} = req.params;
+  const { projectId } = req.params;
   if (!role) {
     throw new AppError("role is required", 400);
   }
@@ -15,7 +15,7 @@ export const inviteMember = asyncHandler(async (req, res) => {
   }
   const user = await UserModel.findOne({ email: email });
   if (!user) {
-    throw new AppError("User Not Found",404);
+    throw new AppError("User Not Found", 404);
   }
   const existingMember = await ProjectMemberModel.findOne({
     userId: user.uid,
@@ -27,5 +27,36 @@ export const inviteMember = asyncHandler(async (req, res) => {
     projectId: projectId,
     role: role,
   });
-  return AppResponse.success(res, {member}, "Invited", 201);
+  return AppResponse.success(res, { member }, "Invited", 201);
+});
+
+export const getMembers = asyncHandler(async (req, res) => {
+  const { projectId } = req.params;
+
+  const members = await ProjectMemberModel.aggregate([
+    {
+      $match: { projectId: new mongoose.Types.ObjectId(projectId) },
+    },
+    {
+      $lookup: {
+        from: "users",      
+        localField: "userId", 
+        foreignField: "uid", 
+        as: "user",
+      },
+    },
+    {
+      $unwind: "$user",
+    },
+    {
+      $project: {
+        _id: 1,
+        role: 1,
+        "user.email": 1,
+        "user.uid": 1,
+      },
+    },
+  ]);
+
+  return AppResponse.success(res, members, "Members Fetched", 200);
 });
