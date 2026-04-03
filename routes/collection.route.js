@@ -27,7 +27,7 @@ collectionRoute.get(
   getAllCollectionByProjectTree,
 );
 collectionRoute.delete(
-  "/delete-collection/:collectionId",
+  "/delete-collection/:collectionId/:projectId",
   authMiddleware,
   checkProjectAccess(["owner", "editor"]),
   deleteCollection,
