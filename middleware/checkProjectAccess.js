@@ -5,12 +5,13 @@ export  const checkProjectAccess = (roles = []) => {
   return asyncHandler(async (req, res, next) => {
     const { projectId } = req.params;
     const userId = req.user.uid;
+    
 
     const member = await ProjectMember.findOne({
       userId: userId,
       projectId: projectId,
     });
-
+    console.log(member)
     if (!member) {
       throw new AppError("Access Denied", 403);
     }

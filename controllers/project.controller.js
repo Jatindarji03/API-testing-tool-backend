@@ -117,7 +117,7 @@ export const getAllUserProject = asyncHandler(async (req, res) => {
   });
   return AppResponse.success(
     res,
-    result,
+    { projects: result },
     projects.length === 0 ? "No Projects Found" : "Projects Fetched",
     200,
   );
