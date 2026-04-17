@@ -11,7 +11,6 @@ export  const checkProjectAccess = (roles = []) => {
       userId: userId,
       projectId: projectId,
     });
-    console.log(member)
     if (!member) {
       throw new AppError("Access Denied", 403);
     }

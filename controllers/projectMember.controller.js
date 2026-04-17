@@ -4,6 +4,7 @@ import AppError from "../utils/AppError.js";
 import AppResponse from "../utils/AppResponse.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import mongoose from "mongoose";
+import sendMail from "../utils/sendMail.js";
 export const inviteMember = asyncHandler(async (req, res) => {
   const { role, email } = req.body;
   const { projectId } = req.params;
@@ -27,7 +28,17 @@ export const inviteMember = asyncHandler(async (req, res) => {
     projectId: projectId,
     role: role,
   });
-  return AppResponse.success(res, { member }, "Invited", 201);
+  await sendMail(
+    user.email,
+    "You have been invited to a project",
+    `Hi , you have been invited to join the project as a ${role}.`,
+  );
+  return AppResponse.success(
+    res,
+    { member: { ...member.toObject(), email: user.email } },
+    "Invited",
+    201,
+  );
 });
 
 export const getMembers = asyncHandler(async (req, res) => {
@@ -39,9 +50,9 @@ export const getMembers = asyncHandler(async (req, res) => {
     },
     {
       $lookup: {
-        from: "users",      
-        localField: "userId", 
-        foreignField: "uid", 
+        from: "users",
+        localField: "userId",
+        foreignField: "uid",
         as: "user",
       },
     },

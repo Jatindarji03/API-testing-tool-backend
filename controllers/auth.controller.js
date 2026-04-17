@@ -118,7 +118,6 @@ const refreshToken = asyncHandler(async (req, res) => {
       },
     )
     .catch((err) => {
-      console.log("There is something error while genrating refresh token");
       throw new AppError(
         "There is something error while genrating refresh token",
         400,
@@ -128,8 +127,8 @@ const refreshToken = asyncHandler(async (req, res) => {
   return AppResponse.success(
     res,
     {
-      tokens: {
-        idToken: response.data.id_token,
+      tokenInfo: {
+        token: response.data.id_token,
         refreshToken: response.data.refresh_token,
         expiresIn: response.data.expires_in,
       },
