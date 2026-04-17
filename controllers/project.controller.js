@@ -5,9 +5,9 @@ import AppResponse from "../utils/AppResponse.js";
 import CollectionModel from "../models/collection.model.js";
 import mongoose from "mongoose";
 import RequestModel from "../models/request.model.js";
+import ProjectMember from "../models/projectMember.model.js";
 export const createProject = asyncHandler(async (req, res) => {
   const { projectName } = req.body;
-  console.log("CREATE CONTROLLER HIT");
   if (!projectName) {
     throw new AppError("Project Name Is Reqired", 400);
   }
@@ -16,8 +16,12 @@ export const createProject = asyncHandler(async (req, res) => {
     userId: req.user.uid,
   });
   await project.save().catch((err) => {
-    console.log("there is something error while saving data");
     throw new AppError("there is something error while saving data", 500, err);
+  });
+  await ProjectMember.create({
+    userId: req.user.uid,
+    role: "owner",
+    projectId: project._id,
   });
   return AppResponse.success(res, { project }, "Project Created", 201);
 });
@@ -25,12 +29,11 @@ export const createProject = asyncHandler(async (req, res) => {
 export const updateProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
   const { projectName } = req.body;
-  console.log(projectId);
   if (!projectName && !projectId) {
     throw new AppError("Project Id and Name is required", 400);
   }
   const updatedProject = await ProjectModel.findOneAndUpdate(
-    { _id: projectId, userId: req.user.uid },
+    { _id: projectId },
     { $set: { projectName } },
     { new: true },
   );
@@ -48,7 +51,6 @@ export const updateProject = asyncHandler(async (req, res) => {
 
 export const deleteProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const userId = req.user?.uid;
   if (!projectId) {
     throw new AppError("Project Id is Required", 400);
   }
@@ -58,7 +60,6 @@ export const deleteProject = asyncHandler(async (req, res) => {
     const project = await ProjectModel.findOne(
       {
         _id: projectId,
-        userId: userId,
       },
       null,
       { session },
@@ -79,6 +80,7 @@ export const deleteProject = asyncHandler(async (req, res) => {
       { session },
     );
     await CollectionModel.deleteMany({ projectId: projectId }, { session });
+    await ProjectMember.deleteMany({ projectId: projectId }, { session });
     await ProjectModel.deleteOne({ _id: projectId }, { session });
     await session.commitTransaction();
     session.endSession();
@@ -96,10 +98,25 @@ export const getAllUserProject = asyncHandler(async (req, res) => {
   if (!userId) {
     throw new AppError("inavlid user", 401);
   }
-  const projects = await ProjectModel.find({ userId: userId });
+
+  const memberships = await ProjectMember.find({ userId: userId });
+
+  if (memberships.length === 0) {
+    return AppResponse.success(res, [], "No Projects Found", 200);
+  }
+
+  const projectIds = memberships.map((m) => m.projectId);
+  const projects = await ProjectModel.find({ _id: { $in: projectIds } }).lean();
+
+  const result = projects.map((project) => {
+    const membership = memberships.find(
+      (m) => m.projectId.toString() === project._id.toString(),
+    );
+    return { ...project, role: membership.role };
+  });
   return AppResponse.success(
     res,
-    { projects },
+    { projects: result },
     projects.length === 0 ? "No Projects Found" : "Projects Fetched",
     200,
   );

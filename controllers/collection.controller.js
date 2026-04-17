@@ -6,24 +6,11 @@ import AppResponse from "../utils/AppResponse.js";
 import mongoose from "mongoose";
 import RequestModel from "../models/request.model.js";
 export const createCollection = asyncHandler(async (req, res) => {
-  const {
-    projectId,
-    collectionName,
-    collectionDescription,
-    parentCollectionId,
-  } = req.body;
-  if (!projectId && !collectionName) {
+  const { projectId } = req.params;
+  const { collectionName, collectionDescription, parentCollectionId } =
+    req.body;
+  if (!projectId || !collectionName) {
     throw new AppError("project id and collection name is required", 400);
-  }
-
-  //checking if the project is valid to particular user
-  const project = await ProjectModel.findOne({
-    _id: projectId,
-    userId: req.user.uid,
-  });
-
-  if (!project) {
-    throw new AppError("project not found or access denied it", 403);
   }
   if (parentCollectionId) {
     const parentCollection = await CollectionModel.findOne({
@@ -45,13 +32,6 @@ export const createCollection = asyncHandler(async (req, res) => {
 
 export const getAllCollectionByProject = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const project = await ProjectModel.find({
-    userId: req.user?.uid,
-    _id: projectId,
-  });
-  if (!project) {
-    throw new AppError("Project Not Found or Access Denied", 403);
-  }
   const collections = await CollectionModel.find({
     projectId: projectId,
   }).sort({ createdAt: 1 });
@@ -60,13 +40,6 @@ export const getAllCollectionByProject = asyncHandler(async (req, res) => {
 
 export const getAllCollectionByProjectTree = asyncHandler(async (req, res) => {
   const { projectId } = req.params;
-  const project = await ProjectModel.find({
-    userId: req.user.uid,
-    _id: projectId,
-  });
-  if (!project) {
-    throw new AppError("Project Not Found or Access Denied", 403);
-  }
   const objectProjectId = new mongoose.Types.ObjectId(projectId);
 
   const collections = await CollectionModel.aggregate([
@@ -111,7 +84,6 @@ export const getAllCollectionByProjectTree = asyncHandler(async (req, res) => {
 
 export const deleteCollection = asyncHandler(async (req, res) => {
   const { collectionId } = req.params;
-  const userId = req.user?.uid;
   if (!collectionId) {
     throw new AppError("Collection Id is required", 400);
   }
@@ -122,14 +94,6 @@ export const deleteCollection = asyncHandler(async (req, res) => {
       await CollectionModel.findById(collectionId).session(session);
     if (!collection) {
       throw new AppError("Collection Not Found", 404);
-    }
-    const project = await ProjectModel.findOne({
-      _id: collection.projectId,
-      userId: userId,
-    }).session(session);
-
-    if (!project) {
-      throw new AppError("Project Not Found or Access Denied", 403);
     }
 
     const result = await CollectionModel.aggregate([
