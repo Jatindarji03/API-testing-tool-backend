@@ -12,6 +12,15 @@ import projectMemberRoutes from "./routes/projectMember.route.js";
 env.config();
 const app = express();
 app.use(express.json());
+
+const corsOptions = {
+  origin: [
+    "http://localhost:5173",
+    "https://apitestingtool.netlify.app/workspace",
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 app.use(cors());
 
 app.use("/api/auth", authRoute);
