@@ -5,8 +5,6 @@ export  const checkProjectAccess = (roles = []) => {
   return asyncHandler(async (req, res, next) => {
     const { projectId } = req.params;
     const userId = req.user.uid;
-    
-
     const member = await ProjectMember.findOne({
       userId: userId,
       projectId: projectId,
@@ -17,7 +15,6 @@ export  const checkProjectAccess = (roles = []) => {
     if (roles.length && !roles.includes(member.role)) {
       throw new AppError("Permission Denied", 403);
     }
-
     req.memberRole = member.role;
     next();
   });

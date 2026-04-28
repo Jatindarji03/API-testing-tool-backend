@@ -21,7 +21,7 @@ const corsOptions = {
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 };
-app.use(cors());
+app.use(cors(corsOptions));
 
 app.use("/api/auth", authRoute);
 app.use("/api/project", projectRoute);
@@ -35,7 +35,7 @@ const startServer = async () => {
   try {
     await connectDB();
     app.listen(process.env.PORT, () => {
-      console.log(`server is started at this post ${process.env.PORT}`);
+      console.log(`server is started at this port ${process.env.PORT}`);
     });
   } catch (err) {
     console.log(`there is some error ${err}`);
