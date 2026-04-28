@@ -16,7 +16,7 @@ app.use(express.json());
 const corsOptions = {
   origin: [
     "http://localhost:5173",
-    "https://apitestingtool.netlify.app/workspace",
+    "https://apitestingtool.netlify.app",
   ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
